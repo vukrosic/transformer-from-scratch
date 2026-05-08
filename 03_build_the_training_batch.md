@@ -405,4 +405,4 @@ You are done when:
 - you can point to one row and verify that `y` is `x` shifted left by one target
 - you understand that `get_batch()` prepares the questions the model learns from
 
-Stop here. Lesson 04 can build token and position embeddings on top of this batch.
+Stop here. Lesson 04 can build token embeddings and introduce RoPE on top of this batch.

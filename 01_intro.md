@@ -12,7 +12,7 @@ write the model, you need a clear picture of what the model is trying to do.
 By the end, you should be able to explain this path:
 
 ```text
-text -> token ids -> embeddings -> causal attention -> MLP -> logits -> next token
+text -> token ids -> token embeddings -> RoPE attention -> MLP -> logits -> next token
 ```
 
 ## Step 1: Start With The Job Of The Model
@@ -148,7 +148,7 @@ The exact numbers are learned. The important part is:
 each token position becomes a vector
 ```
 
-## Step 5: Add Position Information
+## Step 5: Add Position Information With RoPE
 
 Token embeddings alone do not tell the model order.
 
@@ -160,21 +160,30 @@ the cat
 cat the
 ```
 
-But order matters. So the model adds position information:
+Older GPT-style models often added learned position embeddings directly to token
+embeddings:
 
 ```text
 position 0 vector = token_embedding("the") + position_embedding(0)
 position 1 vector = token_embedding("cat") + position_embedding(1)
 ```
 
-Now each vector says two things:
+In this course, we will use the more modern approach: RoPE, short for rotary
+position embeddings.
+
+RoPE does not add a separate position vector to `x` at the start. Instead, it
+adds position information inside attention by rotating the query and key vectors
+based on their positions.
+
+For now, keep the mental model simple:
 
 ```text
-what token is here
-where it appears in the sequence
+token embeddings say what token is here
+RoPE helps attention understand where tokens are relative to each other
 ```
 
-This gives the transformer its starting stream of vectors.
+The transformer still starts with one vector per token position. The difference
+is that position information enters when attention compares positions.
 
 ## Step 6: Understand Why Attention Must Be Causal
 
@@ -249,7 +258,8 @@ without destroying the previous information.
 Think of the residual stream as the model's working memory:
 
 ```text
-start with token + position vectors
+start with token vectors
+attention uses RoPE to compare positions
 block 1 edits the vectors
 block 2 edits the vectors again
 block 3 edits them again
@@ -315,8 +325,8 @@ The model does:
 
 ```text
 1. look up token embeddings for [1, 2]
-2. add position information for positions [0, 1]
-3. pass the vectors through causal decoder blocks
+2. pass the vectors through causal decoder blocks
+3. use RoPE inside attention so positions are understood
 4. project final vectors into vocabulary logits
 5. compare logits against target ids [2, 3]
 6. use the loss to improve the weights
@@ -381,7 +391,7 @@ Why is the future blocked?
 
 Explain this path in 5-7 sentences:
 
-text -> token ids -> embeddings -> causal attention -> MLP -> logits -> loss
+text -> token ids -> token embeddings -> RoPE attention -> MLP -> logits -> loss
 
 ## Training vs Generation
 

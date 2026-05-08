@@ -3,7 +3,7 @@
 Lesson 01 explained the mental model:
 
 ```text
-text -> token ids -> embeddings -> causal attention -> MLP -> logits -> next token
+text -> token ids -> token embeddings -> RoPE attention -> MLP -> logits -> next token
 ```
 
 This lesson turns that idea into the shapes a decoder-only transformer actually
@@ -15,10 +15,10 @@ that enters the model and the data that comes out.
 By the end, this should feel natural:
 
 ```text
-input ids:  [batch, time]
-targets:    [batch, time]
-embeddings: [batch, time, channels]
-logits:     [batch, time, vocab_size]
+input ids:        [batch, time]
+targets:          [batch, time]
+token embeddings: [batch, time, channels]
+logits:           [batch, time, vocab_size]
 ```
 
 ## Step 1: Learn The Three Shape Words
@@ -216,11 +216,21 @@ Read that as:
 8 numbers per position
 ```
 
-## Step 6: Add Position Embeddings
+## Step 6: Understand Where RoPE Fits
 
 Token embeddings know what token is present.
 
-Position embeddings tell the model where the token is.
+The model also needs position information, but modern GPT-style models often do
+not add learned position embeddings directly to `x`.
+
+In this course, we will use RoPE:
+
+```text
+RoPE = rotary position embeddings
+```
+
+RoPE applies position information inside attention, after token embeddings have
+already produced `x`.
 
 If:
 
@@ -229,38 +239,39 @@ T = 4
 C = 8
 ```
 
-then the position embedding table for this context has shape:
-
-```text
-[T, C] = [4, 8]
-```
-
-One position vector exists for each position:
-
-```text
-position 0 -> vector of size 8
-position 1 -> vector of size 8
-position 2 -> vector of size 8
-position 3 -> vector of size 8
-```
-
-The model adds token and position embeddings:
-
-```text
-x = token_embedding(input_ids) + position_embedding(positions)
-```
-
-The shape stays:
+then token embeddings still produce:
 
 ```text
 x.shape = [B, T, C]
 ```
 
-Nothing mysterious happened. Each token position now has a vector that contains:
+Inside attention, `x` is projected into queries, keys, and values:
 
 ```text
-what token this is
-where this token is
+q.shape = [B, T, head_size]
+k.shape = [B, T, head_size]
+v.shape = [B, T, head_size]
+```
+
+RoPE rotates `q` and `k` based on position:
+
+```text
+q = apply_rope(q, positions)
+k = apply_rope(k, positions)
+```
+
+The shape does not change:
+
+```text
+q.shape stays [B, T, head_size]
+k.shape stays [B, T, head_size]
+```
+
+This is the key difference from learned absolute position embeddings:
+
+```text
+token embeddings create x
+RoPE adds position information when attention compares q and k
 ```
 
 ## Step 7: Keep The Same Shape Through Decoder Blocks
@@ -287,9 +298,9 @@ x.shape = [B, T, C]
 
 The meaning changes, not the shape.
 
-At the start, each vector mostly represents token and position information.
-After several decoder blocks, each vector represents richer context about the
-prefix visible at that position.
+At the start, each vector mostly represents token information. During attention,
+RoPE helps the model understand token positions. After several decoder blocks,
+each vector represents richer context about the prefix visible at that position.
 
 For example, the vector at position 3 can contain information from positions:
 
@@ -416,9 +427,9 @@ split:
 
 embed:
     token embeddings [B, T, C]
-    position added   [B, T, C]
 
 decoder blocks:
+    RoPE is applied inside attention to q and k
     hidden states    [B, T, C]
 
 final projection:
@@ -466,6 +477,7 @@ Fill this in:
 
 input ids:
 embeddings:
+where RoPE is applied:
 after decoder blocks:
 logits:
 
